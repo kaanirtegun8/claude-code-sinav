@@ -11,6 +11,8 @@ const state = {
   currentQuestionIndex: 0,
   currentSection: 'fillInBlanks',
   answers: {},
+  classicGrades: {},
+  classicShown: {},
   startTime: null,
   showResults: false,
   examResults: {},
@@ -120,24 +122,27 @@ function renderHome(container) {
     ? Math.round(Object.values(progress).reduce((sum, p) => sum + (p.percentage || 0), 0) / Object.values(progress).length)
     : 0;
 
+  const totalQuestions = EXAMS.reduce((sum, e) => sum + e.fillInBlanks.length + e.multipleChoice.length + (e.classicQuestions ? e.classicQuestions.length : 0), 0);
+  const totalExams = EXAMS.length;
+
   container.innerHTML = `
     <div class="hero">
       <div class="hero-badge">Aktif Sistem</div>
       <h2>Yetişkin Gelişim Psikolojisi<br>İnteraktif Sınav Platformu</h2>
-      <p>10 farklı sınav, 350 soru. Her sınavda 4 PDF kaynaktan karışık sorular: genç yetişkinlik, orta yetişkinlik, ileri yetişkinlik ve ölüm/yas konularını kapsar.</p>
+      <p>${totalExams} farklı sınav, ${totalQuestions} soru. Her sınavda 4 PDF kaynaktan karışık sorular: genç yetişkinlik, orta yetişkinlik, ileri yetişkinlik ve ölüm/yas konularını kapsar. Boşluk doldurma, çoktan seçmeli ve klasik soru türleri.</p>
     </div>
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-value">10</div>
+        <div class="stat-value">${totalExams}</div>
         <div class="stat-label">Sınav</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">350</div>
+        <div class="stat-value">${totalQuestions}</div>
         <div class="stat-label">Toplam Soru</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${completedCount}/10</div>
+        <div class="stat-value">${completedCount}/${totalExams}</div>
         <div class="stat-label">Tamamlanan</div>
       </div>
       <div class="stat-card">
@@ -164,15 +169,21 @@ function renderHome(container) {
             <p class="exam-card-desc">${exam.description}</p>
             <div class="exam-card-info">
               <div class="exam-info-item">
-                <span class="exam-info-value">10</span>
+                <span class="exam-info-value">${exam.fillInBlanks.length}</span>
                 <span class="exam-info-label">Boşluk</span>
               </div>
               <div class="exam-info-item">
-                <span class="exam-info-value">25</span>
+                <span class="exam-info-value">${exam.multipleChoice.length}</span>
                 <span class="exam-info-label">Test</span>
               </div>
+              ${exam.classicQuestions && exam.classicQuestions.length > 0 ? `
               <div class="exam-info-item">
-                <span class="exam-info-value">35</span>
+                <span class="exam-info-value">${exam.classicQuestions.length}</span>
+                <span class="exam-info-label">Klasik</span>
+              </div>
+              ` : ''}
+              <div class="exam-info-item">
+                <span class="exam-info-value">${exam.fillInBlanks.length + exam.multipleChoice.length + (exam.classicQuestions ? exam.classicQuestions.length : 0)}</span>
                 <span class="exam-info-label">Toplam</span>
               </div>
             </div>
@@ -219,8 +230,14 @@ function renderModeSelection(container) {
           <div style="font-size: 22px; font-weight: 800; color: var(--accent);">${exam.multipleChoice.length}</div>
           <div style="font-size: 12px; color: var(--text-muted);">Çoktan Seçmeli</div>
         </div>
+        ${exam.classicQuestions && exam.classicQuestions.length > 0 ? `
         <div>
-          <div style="font-size: 22px; font-weight: 800; color: var(--accent);">${exam.fillInBlanks.length + exam.multipleChoice.length}</div>
+          <div style="font-size: 22px; font-weight: 800; color: var(--accent);">${exam.classicQuestions.length}</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Klasik / Açık Uçlu</div>
+        </div>
+        ` : ''}
+        <div>
+          <div style="font-size: 22px; font-weight: 800; color: var(--accent);">${exam.fillInBlanks.length + exam.multipleChoice.length + (exam.classicQuestions ? exam.classicQuestions.length : 0)}</div>
           <div style="font-size: 12px; color: var(--text-muted);">Toplam Soru</div>
         </div>
       </div>
@@ -259,17 +276,20 @@ function renderModeSelection(container) {
 
 function startExam() {
   const exam = EXAMS.find(e => e.id === state.selectedExamId);
-  // Shuffle questions for variety
   const fbs = exam.fillInBlanks.map((q, i) => ({ ...q, _type: 'fb', _originalIndex: i }));
   const mcs = exam.multipleChoice.map((q, i) => ({ ...q, _type: 'mc', _originalIndex: i }));
+  const kcs = (exam.classicQuestions || []).map((q, i) => ({ ...q, _type: 'kc', _originalIndex: i }));
 
   state.shuffledQuestions = {
     fillInBlanks: fbs,
-    multipleChoice: mcs
+    multipleChoice: mcs,
+    classicQuestions: kcs
   };
   state.currentSection = 'fillInBlanks';
   state.currentQuestionIndex = 0;
   state.answers = {};
+  state.classicGrades = {};
+  state.classicShown = {};
   state.startTime = Date.now();
   state.view = 'exam';
   state.examResults = {};
@@ -299,7 +319,8 @@ function renderExam(container) {
 
   const totalFB = state.shuffledQuestions.fillInBlanks.length;
   const totalMC = state.shuffledQuestions.multipleChoice.length;
-  const totalQuestions = totalFB + totalMC;
+  const totalKC = state.shuffledQuestions.classicQuestions.length;
+  const totalQuestions = totalFB + totalMC + totalKC;
 
   let answeredCount = 0;
   for (let i = 0; i < totalFB; i++) {
@@ -307,6 +328,9 @@ function renderExam(container) {
   }
   for (let i = 0; i < totalMC; i++) {
     if (state.answers[getAnswerKey('multipleChoice', i)] !== undefined) answeredCount++;
+  }
+  for (let i = 0; i < totalKC; i++) {
+    if (state.classicGrades[getAnswerKey('classicQuestions', i)] !== undefined) answeredCount++;
   }
 
   const progressPercent = (answeredCount / totalQuestions) * 100;
@@ -350,6 +374,12 @@ function renderExam(container) {
           Çoktan Seçmeli
           <span class="count">${totalMC}</span>
         </button>
+        ${totalKC > 0 ? `
+        <button class="section-tab ${state.currentSection === 'classicQuestions' ? 'active' : ''}" data-section="classicQuestions">
+          Klasik
+          <span class="count">${totalKC}</span>
+        </button>
+        ` : ''}
       </div>
 
       <div class="question-card">
@@ -358,23 +388,27 @@ function renderExam(container) {
             <span class="question-number-badge">${state.currentQuestionIndex + 1}</span>
             <span>/ ${questions.length}</span>
           </div>
-          <span class="question-type-badge ${state.currentSection === 'fillInBlanks' ? 'fb' : 'mc'}">
-            ${state.currentSection === 'fillInBlanks' ? 'BOŞLUK DOLDURMA' : 'ÇOKTAN SEÇMELİ'}
+          <span class="question-type-badge ${state.currentSection === 'fillInBlanks' ? 'fb' : (state.currentSection === 'classicQuestions' ? 'kc' : 'mc')}">
+            ${state.currentSection === 'fillInBlanks' ? 'BOŞLUK DOLDURMA' : (state.currentSection === 'classicQuestions' ? 'KLASİK / AÇIK UÇLU' : 'ÇOKTAN SEÇMELİ')}
           </span>
         </div>
 
         <div class="question-text">${question.question}</div>
 
-        ${state.currentSection === 'fillInBlanks' ? renderFillInQuestion(question, userAnswer, showFeedback) : renderMCQuestion(question, userAnswer, showFeedback)}
+        ${state.currentSection === 'fillInBlanks'
+          ? renderFillInQuestion(question, userAnswer, showFeedback)
+          : (state.currentSection === 'classicQuestions'
+            ? renderClassicQuestion(question, userAnswer, answerKey)
+            : renderMCQuestion(question, userAnswer, showFeedback))}
 
-        ${showFeedback ? renderFeedback(question, userAnswer) : ''}
+        ${showFeedback && state.currentSection !== 'classicQuestions' ? renderFeedback(question, userAnswer) : ''}
       </div>
 
       <div class="exam-nav">
         <button class="nav-btn secondary" id="prev-btn" ${state.currentQuestionIndex === 0 && state.currentSection === 'fillInBlanks' ? 'disabled' : ''}>← Önceki</button>
 
         <div class="question-jumper">
-          ${renderJumper(totalFB, totalMC)}
+          ${renderJumper(totalFB, totalMC, totalKC)}
         </div>
 
         ${renderNextButton(answeredCount, totalQuestions)}
@@ -428,6 +462,43 @@ function renderMCQuestion(question, userAnswer, showFeedback) {
   `;
 }
 
+function renderClassicQuestion(question, userAnswer, answerKey) {
+  const isShown = state.classicShown[answerKey];
+  const grade = state.classicGrades[answerKey];
+
+  return `
+    <textarea
+      class="classic-input"
+      id="classic-input"
+      placeholder="Cevabını buraya detaylı bir şekilde yaz... Klasik soru olduğu için anahtar kavramları açıklayarak yaz."
+      ${isShown ? 'disabled' : ''}
+    >${escapeHtml(userAnswer || '')}</textarea>
+    ${!isShown ? `
+      <div class="classic-actions">
+        <button class="show-answer-btn" id="show-classic-answer">Cevabı Göster ve Karşılaştır</button>
+      </div>
+    ` : `
+      <div class="classic-answer-box">
+        <div class="answer-label">Örnek Cevap</div>
+        <div class="classic-answer-text">${escapeHtml(question.answer)}</div>
+        ${question.keyPoints && question.keyPoints.length > 0 ? `
+          <div class="classic-keypoints">
+            ${question.keyPoints.map(kp => `<span class="keypoint-chip">${escapeHtml(kp)}</span>`).join('')}
+          </div>
+        ` : ''}
+      </div>
+      <div class="self-grade-section">
+        <div class="self-grade-label">Cevabını örnek cevapla karşılaştır ve kendini değerlendir:</div>
+        <div class="self-grade-buttons">
+          <button class="grade-btn ${grade === 'correct' ? 'selected correct' : ''}" data-grade="correct">✓ Tam Doğru</button>
+          <button class="grade-btn ${grade === 'partial' ? 'selected partial' : ''}" data-grade="partial">~ Kısmen Doğru</button>
+          <button class="grade-btn ${grade === 'wrong' ? 'selected wrong' : ''}" data-grade="wrong">✗ Yanlış / Eksik</button>
+        </div>
+      </div>
+    `}
+  `;
+}
+
 function renderFeedback(question, userAnswer) {
   let isCorrect;
   let correctAnswerText;
@@ -457,23 +528,39 @@ function renderFeedback(question, userAnswer) {
   `;
 }
 
-function renderJumper(totalFB, totalMC) {
-  const total = state.currentSection === 'fillInBlanks' ? totalFB : totalMC;
+function renderJumper(totalFB, totalMC, totalKC) {
+  let total;
+  if (state.currentSection === 'fillInBlanks') total = totalFB;
+  else if (state.currentSection === 'multipleChoice') total = totalMC;
+  else total = totalKC;
   let html = '';
   for (let i = 0; i < total; i++) {
     const ansKey = getAnswerKey(state.currentSection, i);
-    const isAnswered = state.answers[ansKey] !== undefined;
+    let isAnswered;
+    if (state.currentSection === 'classicQuestions') {
+      isAnswered = state.classicGrades[ansKey] !== undefined;
+    } else {
+      isAnswered = state.answers[ansKey] !== undefined;
+    }
     const isCurrent = i === state.currentQuestionIndex;
     let cls = '';
     if (isCurrent) cls = 'current';
     else if (isAnswered) {
-      if (state.mode === 'instant') {
+      if (state.mode === 'instant' || state.currentSection === 'classicQuestions') {
         const q = state.shuffledQuestions[state.currentSection][i];
-        const ans = state.answers[ansKey];
-        const correct = state.currentSection === 'fillInBlanks'
-          ? checkFillAnswer(ans, q)
-          : ans === q.correctIndex;
-        cls = correct ? 'correct' : 'incorrect';
+        let correct;
+        if (state.currentSection === 'classicQuestions') {
+          const g = state.classicGrades[ansKey];
+          correct = g === 'correct';
+          if (g === 'partial') cls = 'answered';
+          else cls = correct ? 'correct' : 'incorrect';
+        } else {
+          const ans = state.answers[ansKey];
+          correct = state.currentSection === 'fillInBlanks'
+            ? checkFillAnswer(ans, q)
+            : ans === q.correctIndex;
+          cls = correct ? 'correct' : 'incorrect';
+        }
       } else {
         cls = 'answered';
       }
@@ -486,14 +573,13 @@ function renderJumper(totalFB, totalMC) {
 function renderNextButton(answeredCount, totalQuestions) {
   const questions = getCurrentQuestions();
   const isLastInSection = state.currentQuestionIndex === questions.length - 1;
-  const isLastSection = state.currentSection === 'multipleChoice';
+  const hasClassic = state.shuffledQuestions.classicQuestions.length > 0;
+  const isLastSection = hasClassic
+    ? state.currentSection === 'classicQuestions'
+    : state.currentSection === 'multipleChoice';
 
   if (isLastInSection && isLastSection) {
-    if (answeredCount === totalQuestions || state.mode === 'instant') {
-      return `<button class="nav-btn finish" id="finish-btn">Sınavı Bitir →</button>`;
-    } else {
-      return `<button class="nav-btn finish" id="finish-btn">Sonuçları Gör (${answeredCount}/${totalQuestions})</button>`;
-    }
+    return `<button class="nav-btn finish" id="finish-btn">Sınavı Bitir →</button>`;
   }
 
   return `<button class="nav-btn primary" id="next-btn">Sonraki →</button>`;
@@ -522,11 +608,15 @@ function attachExamHandlers(question, answerKey) {
   const prevBtn = document.getElementById('prev-btn');
   if (prevBtn) {
     prevBtn.addEventListener('click', () => {
+      handleSaveCurrentAnswer(question, answerKey);
       if (state.currentQuestionIndex > 0) {
         state.currentQuestionIndex--;
       } else if (state.currentSection === 'multipleChoice') {
         state.currentSection = 'fillInBlanks';
         state.currentQuestionIndex = state.shuffledQuestions.fillInBlanks.length - 1;
+      } else if (state.currentSection === 'classicQuestions') {
+        state.currentSection = 'multipleChoice';
+        state.currentQuestionIndex = state.shuffledQuestions.multipleChoice.length - 1;
       }
       render();
     });
@@ -589,6 +679,34 @@ function attachExamHandlers(question, answerKey) {
     if (!fillInput.disabled) fillInput.focus();
   }
 
+  // Classic: show answer button
+  const showAnswerBtn = document.getElementById('show-classic-answer');
+  if (showAnswerBtn) {
+    showAnswerBtn.addEventListener('click', () => {
+      const ta = document.getElementById('classic-input');
+      if (ta) state.answers[answerKey] = ta.value;
+      state.classicShown[answerKey] = true;
+      render();
+    });
+  }
+
+  // Classic: self-grade buttons
+  document.querySelectorAll('.grade-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.classicGrades[answerKey] = btn.dataset.grade;
+      render();
+    });
+  });
+
+  // Classic input typing (keep answer in state)
+  const classicInput = document.getElementById('classic-input');
+  if (classicInput) {
+    classicInput.addEventListener('input', (e) => {
+      state.answers[answerKey] = e.target.value;
+    });
+    if (!classicInput.disabled) classicInput.focus();
+  }
+
   // MC option click
   document.querySelectorAll('.option').forEach(opt => {
     opt.addEventListener('click', () => {
@@ -622,15 +740,24 @@ function handleSaveCurrentAnswer(question, answerKey) {
         state.answers[answerKey] = val;
       }
     }
+  } else if (state.currentSection === 'classicQuestions') {
+    const ta = document.getElementById('classic-input');
+    if (ta && !ta.disabled) {
+      state.answers[answerKey] = ta.value;
+    }
   }
 }
 
 function goToNext() {
   const questions = getCurrentQuestions();
+  const hasClassic = state.shuffledQuestions.classicQuestions.length > 0;
   if (state.currentQuestionIndex < questions.length - 1) {
     state.currentQuestionIndex++;
   } else if (state.currentSection === 'fillInBlanks') {
     state.currentSection = 'multipleChoice';
+    state.currentQuestionIndex = 0;
+  } else if (state.currentSection === 'multipleChoice' && hasClassic) {
+    state.currentSection = 'classicQuestions';
     state.currentQuestionIndex = 0;
   }
   render();
@@ -640,9 +767,11 @@ function finishExam() {
   const exam = EXAMS.find(e => e.id === state.selectedExamId);
   const fbs = state.shuffledQuestions.fillInBlanks;
   const mcs = state.shuffledQuestions.multipleChoice;
+  const kcs = state.shuffledQuestions.classicQuestions;
 
   let fbCorrect = 0, mcCorrect = 0;
-  const review = { fillInBlanks: [], multipleChoice: [] };
+  let kcPoints = 0;
+  const review = { fillInBlanks: [], multipleChoice: [], classicQuestions: [] };
 
   fbs.forEach((q, i) => {
     const ans = state.answers[getAnswerKey('fillInBlanks', i)];
@@ -668,8 +797,25 @@ function finishExam() {
     });
   });
 
-  const totalCorrect = fbCorrect + mcCorrect;
-  const totalQuestions = fbs.length + mcs.length;
+  kcs.forEach((q, i) => {
+    const key = getAnswerKey('classicQuestions', i);
+    const ans = state.answers[key];
+    const grade = state.classicGrades[key];
+    let pts = 0;
+    if (grade === 'correct') pts = 1;
+    else if (grade === 'partial') pts = 0.5;
+    kcPoints += pts;
+    review.classicQuestions.push({
+      question: q,
+      userAnswer: ans,
+      grade,
+      points: pts,
+      answered: grade !== undefined
+    });
+  });
+
+  const totalCorrect = fbCorrect + mcCorrect + kcPoints;
+  const totalQuestions = fbs.length + mcs.length + kcs.length;
   const percentage = Math.round((totalCorrect / totalQuestions) * 100);
   const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
 
@@ -678,15 +824,17 @@ function finishExam() {
     examTitle: exam.title,
     fbCorrect,
     mcCorrect,
-    totalCorrect,
+    kcPoints,
+    totalCorrect: Math.round(totalCorrect * 10) / 10,
     totalQuestions,
     percentage,
     elapsed,
     review,
-    grade: getGrade(percentage)
+    grade: getGrade(percentage),
+    hasClassic: kcs.length > 0
   };
 
-  saveExamResult(exam.id, totalCorrect, totalQuestions, percentage);
+  saveExamResult(exam.id, Math.round(totalCorrect * 10) / 10, totalQuestions, percentage);
   state.view = 'results';
   render();
 }
@@ -705,8 +853,11 @@ function renderResults(container) {
   const r = state.examResults;
   const elapsedMin = Math.floor(r.elapsed / 60);
   const elapsedSec = r.elapsed % 60;
-  const skipped = r.totalQuestions - (r.review.fillInBlanks.filter(x => x.answered).length + r.review.multipleChoice.filter(x => x.answered).length);
-  const wrong = r.totalQuestions - r.totalCorrect - skipped;
+  const answeredFB = r.review.fillInBlanks.filter(x => x.answered).length;
+  const answeredMC = r.review.multipleChoice.filter(x => x.answered).length;
+  const answeredKC = r.review.classicQuestions.filter(x => x.answered).length;
+  const skipped = r.totalQuestions - (answeredFB + answeredMC + answeredKC);
+  const wrong = Math.max(0, r.totalQuestions - r.totalCorrect - skipped);
 
   const circumference = 2 * Math.PI * 80;
   const offset = circumference * (1 - r.percentage / 100);
@@ -766,6 +917,12 @@ function renderResults(container) {
           <div class="result-stat-value">${r.mcCorrect}/${r.review.multipleChoice.length}</div>
           <div class="result-stat-label">Test</div>
         </div>
+        ${r.hasClassic ? `
+        <div class="result-stat">
+          <div class="result-stat-value">${r.kcPoints}/${r.review.classicQuestions.length}</div>
+          <div class="result-stat-label">Klasik</div>
+        </div>
+        ` : ''}
       </div>
 
       <div class="results-actions">
@@ -780,6 +937,11 @@ function renderResults(container) {
 
         <h3 style="margin-top: 32px;">Çoktan Seçmeli Sorular (${r.mcCorrect}/${r.review.multipleChoice.length})</h3>
         ${r.review.multipleChoice.map((item, i) => renderReviewCard(item, i, 'mc')).join('')}
+
+        ${r.hasClassic ? `
+        <h3 style="margin-top: 32px;">Klasik Sorular (${r.kcPoints}/${r.review.classicQuestions.length})</h3>
+        ${r.review.classicQuestions.map((item, i) => renderReviewCard(item, i, 'kc')).join('')}
+        ` : ''}
       </div>
     </div>
   `;
@@ -806,7 +968,21 @@ function renderReviewCard(item, index, type) {
   const q = item.question;
   let cls, status;
 
-  if (!item.answered) {
+  if (type === 'kc') {
+    if (!item.answered) {
+      cls = 'wrong';
+      status = '<span class="review-status skipped">DEĞERLENDİRİLMEDİ</span>';
+    } else if (item.grade === 'correct') {
+      cls = 'correct';
+      status = '<span class="review-status correct">TAM DOĞRU (1 puan)</span>';
+    } else if (item.grade === 'partial') {
+      cls = '';
+      status = '<span class="review-status" style="background: var(--warning-soft); color: var(--warning);">KISMEN (0.5 puan)</span>';
+    } else {
+      cls = 'wrong';
+      status = '<span class="review-status wrong">YANLIŞ / EKSİK</span>';
+    }
+  } else if (!item.answered) {
     cls = 'wrong';
     status = '<span class="review-status skipped">BOŞ BIRAKILDI</span>';
   } else if (item.correct) {
@@ -825,12 +1001,20 @@ function renderReviewCard(item, index, type) {
     if (!item.correct) {
       answerHtml += `<div class="review-answer correct-answer">Doğru cevap: <strong>${escapeHtml(q.answer)}</strong></div>`;
     }
-  } else {
+  } else if (type === 'mc') {
     if (item.answered) {
       answerHtml += `<div class="review-answer your-answer ${item.correct ? '' : 'wrong'}">Senin cevabın: <strong>${String.fromCharCode(65 + item.userAnswer)}) ${escapeHtml(q.options[item.userAnswer])}</strong></div>`;
     }
     if (!item.correct) {
       answerHtml += `<div class="review-answer correct-answer">Doğru cevap: <strong>${String.fromCharCode(65 + q.correctIndex)}) ${escapeHtml(q.options[q.correctIndex])}</strong></div>`;
+    }
+  } else if (type === 'kc') {
+    if (item.userAnswer && item.userAnswer.trim()) {
+      answerHtml += `<div class="review-answer your-answer">Senin cevabın:<br><strong>${escapeHtml(item.userAnswer)}</strong></div>`;
+    }
+    answerHtml += `<div class="review-answer correct-answer">Örnek cevap:<br><strong>${escapeHtml(q.answer)}</strong></div>`;
+    if (q.keyPoints && q.keyPoints.length > 0) {
+      answerHtml += `<div class="classic-keypoints" style="margin-top: 8px;">${q.keyPoints.map(kp => `<span class="keypoint-chip">${escapeHtml(kp)}</span>`).join('')}</div>`;
     }
   }
 

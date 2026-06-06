@@ -655,6 +655,11 @@ body {
   color: var(--warning);
 }
 
+.question-type-badge.kc {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
 .question-text {
   font-size: 17px;
   line-height: 1.6;
@@ -751,6 +756,160 @@ body {
   background: var(--error);
   border-color: var(--error);
   color: white;
+}
+
+/* CLASSIC (OPEN-ENDED) */
+.classic-input {
+  width: 100%;
+  min-height: 160px;
+  padding: 16px 18px;
+  background: var(--bg-elevated);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.6;
+  transition: all 0.2s ease;
+}
+
+.classic-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.classic-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.classic-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.show-answer-btn {
+  padding: 12px 22px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent-hover);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.show-answer-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.classic-answer-box {
+  margin-top: 16px;
+  padding: 18px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+
+.classic-answer-box .answer-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-hover);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.classic-answer-text {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.classic-keypoints {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keypoint-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.self-grade-section {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.self-grade-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.self-grade-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.grade-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.grade-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.grade-btn.selected.correct {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.grade-btn.selected.partial {
+  background: var(--warning-soft);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.grade-btn.selected.wrong {
+  background: var(--error-soft);
+  border-color: var(--error);
+  color: var(--error);
 }
 
 /* FILL IN BLANK */
